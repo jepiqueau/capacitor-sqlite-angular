@@ -6,18 +6,18 @@ import { BehaviorSubject } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 import { SQLConnectionNotReadyError } from './errors/connection-not-ready-error';
 
-const READONLY: boolean = false;
+const READONLY = false;
 
 @Injectable({
   providedIn: 'root'
 })
 export class SqliteOfficialService {
-
-  private ready$ = new BehaviorSubject<boolean>(false);
   native: boolean = this.isNative();
   platform = Capacitor.getPlatform();
 
   sqliteConnection: SQLiteConnection = new SQLiteConnection(CapacitorSQLite);
+
+  private ready$ = new BehaviorSubject<boolean>(false);
 
   constructor(private platformService: Platform) {
     if (this.platform === 'web') {
@@ -26,10 +26,12 @@ export class SqliteOfficialService {
       this.ready$.next(true);
     }
   }
-
+  getPlatform() {
+    return this.platform;
+  }
   /**
- * Does some stuff, which is necessary for the web platform
- */
+   * Does some stuff, which is necessary for the web platform
+   */
   async initWeb() {
     await this.platformService.ready();
     await customElements.whenDefined('jeep-sqlite');
@@ -44,13 +46,11 @@ export class SqliteOfficialService {
     }
   }
 
-  private isNative() {
-    return this.platform === 'ios' || this.platform === 'android'
-  }
 
   /**
    * Echo a value
-   * @param value 
+   *
+   * @param value
    */
   async echo(value: string): Promise<string> {
     await this.ready('echo');
@@ -109,24 +109,25 @@ export class SqliteOfficialService {
 
   /**
    * addUpgradeStatement
-   * @param database 
-   * @param fromVersion 
-   * @param toVersion 
-   * @param statement 
-   * @param set 
+   *
+   * @param database
+   * @param fromVersion
+   * @param toVersion
+   * @param statement
+   * @param set
    */
   async addUpgradeStatement(
     database: string,
     toVersion: number,
     statements: string[],
-  )
-    : Promise<void> {
+  ): Promise<void> {
     await this.ready('addUpgradeStatement');
     return this.sqliteConnection.addUpgradeStatement(database, toVersion, statements);
   }
 
   /**
    * get a non-conformed database path
+   *
    * @param path
    * @param database
    * @returns Promise<capNCDatabasePathResult>
@@ -140,6 +141,7 @@ export class SqliteOfficialService {
   }
   /**
    * Create a non-conformed database connection
+   *
    * @param databasePath
    * @param version
    * @returns Promise<SQLiteDBConnection>
@@ -156,6 +158,7 @@ export class SqliteOfficialService {
   }
   /**
    * Close a non-conformed database connection
+   *
    * @param databasePath
    * @returns Promise<void>
    * @since 3.3.3-1
@@ -167,6 +170,7 @@ export class SqliteOfficialService {
 
   /**
    * Check if a non-conformed databaseconnection exists
+   *
    * @param databasePath
    * @returns Promise<boolean>
    * @since 3.3.3-1
@@ -180,6 +184,7 @@ export class SqliteOfficialService {
 
   /**
    * Retrieve a non-conformed database connection
+   *
    * @param databasePath
    * @returns Promise<SQLiteDBConnection>
    * @since 3.3.3-1
@@ -191,6 +196,7 @@ export class SqliteOfficialService {
 
   /**
    * Check if a non conformed database exists
+   *
    * @param databasePath
    * @returns Promise<boolean>
    * @since 3.3.3-1
@@ -204,10 +210,11 @@ export class SqliteOfficialService {
 
   /**
    * Create a connection to a database
-   * @param database 
-   * @param encrypted 
-   * @param mode 
-   * @param version 
+   *
+   * @param database
+   * @param encrypted
+   * @param mode
+   * @param version
    */
   async createConnection(database: string, encrypted: boolean,
     mode: string, version: number
@@ -224,16 +231,17 @@ export class SqliteOfficialService {
 
   /**
    * Close a connection to a database
-   * @param database 
+   *
+   * @param database
    */
   async closeConnection(database: string): Promise<void> {
     await this.ready('closeConnection');
     return this.sqliteConnection.closeConnection(database, READONLY);
   }
   /**
-   * 
    * Retrieve an existing connection to a database
-   * @param database 
+   *
+   * @param database
    */
   async retrieveConnection(database: string): Promise<SQLiteDBConnection> {
     await this.ready('retrieveConnection');
@@ -249,7 +257,7 @@ export class SqliteOfficialService {
     /*                let keys = [...myConns.keys()];
                     keys.forEach( (value) => {
                         console.log("Connection: " + value);
-                    }); 
+                    });
     */
     return myConns;
   }
@@ -264,7 +272,8 @@ export class SqliteOfficialService {
 
   /**
    * Check if connection exists
-   * @param database 
+   *
+   * @param database
    */
   async isConnection(database: string): Promise<boolean> {
     await this.ready('isConnection');
@@ -275,7 +284,8 @@ export class SqliteOfficialService {
 
   /**
    * Check Connections Consistency
-   * @returns 
+   *
+   * @returns
    */
   async checkConnectionsConsistency(): Promise<boolean> {
     await this.ready('checkConnectionsConsistency');
@@ -286,7 +296,8 @@ export class SqliteOfficialService {
 
   /**
    * Check if database exists
-   * @param database 
+   *
+   * @param database
    */
   async databaseExists(database: string): Promise<boolean> {
     await this.ready('isDatabase');
@@ -324,7 +335,7 @@ export class SqliteOfficialService {
     this.ensureNative();
     await this.ready('addSQLiteSuffix');
 
-    const path: string = folderPath ? folderPath : "default";
+    const path: string = folderPath ? folderPath : 'default';
     const dbList: string[] = dbNameList ? dbNameList : [];
     return this.sqliteConnection.addSQLiteSuffix(path, dbList);
   }
@@ -336,14 +347,15 @@ export class SqliteOfficialService {
     this.ensureNative();
     await this.ready('deleteOldDatabases');
 
-    const path: string = folderPath ? folderPath : "default";
+    const path: string = folderPath ? folderPath : 'default';
     const dbList: string[] = dbNameList ? dbNameList : [];
     return this.sqliteConnection.deleteOldDatabases(path, dbList);
   }
 
   /**
    * Import from a Json Object
-   * @param jsonstring 
+   *
+   * @param jsonstring
    */
   async importFromJson(jsonstring: string): Promise<Changes> {
     await this.ready('importFromJson');
@@ -354,6 +366,7 @@ export class SqliteOfficialService {
 
   /**
    * Is Json Object Valid
+   *
    * @param jsonstring Check the validity of a given Json Object
    */
 
@@ -376,7 +389,8 @@ export class SqliteOfficialService {
 
   /**
    * Initialize the Web store
-   * @param database 
+   *
+   * @param database
    */
   async initWebStore(): Promise<void> {
     if (this.platform !== 'web') {
@@ -389,7 +403,8 @@ export class SqliteOfficialService {
 
   /**
    * Save a database to store
-   * @param database 
+   *
+   * @param database
    */
   async saveToStore(database: string): Promise<void> {
     if (this.platform !== 'web') {
@@ -402,9 +417,9 @@ export class SqliteOfficialService {
 
   /**
    * Drops a database
-   * 
-   * @param databaseName 
-   * @returns 
+   *
+   * @param databaseName
+   * @returns
    */
   async dropDatabase(databaseName: string): Promise<void> {
     await this.ready('deleteDatabase');
@@ -412,6 +427,10 @@ export class SqliteOfficialService {
     const dbConnection = await this.openDB(databaseName);
 
     await dbConnection.delete();
+  }
+
+  private isNative() {
+    return this.platform === 'ios' || this.platform === 'android';
   }
 
   private ensureNative() {
@@ -422,7 +441,7 @@ export class SqliteOfficialService {
 
   private ready(methodname: string, waitMs: number = 1000): Promise<void> {
     return new Promise((resolve) => {
-      let success: boolean = false;
+      let success = false;
 
       setTimeout(() => {
         if (!success) {

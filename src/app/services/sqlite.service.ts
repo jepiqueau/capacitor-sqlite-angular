@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { CapacitorSQLite } from '@capacitor-community/sqlite';
+import { CapacitorSQLite, SQLiteDBConnection } from '@capacitor-community/sqlite';
 import { productSchemaJson } from '../sqldata/product.sql';
 import { SqliteOfficialService } from './sqlite-official.service';
 
@@ -41,12 +41,12 @@ export class SqliteService {
     console.log('DB LIST', (await this.sqlite.getDatabaseList()).values);
     const dbConnection = await this.sqlite.openDB('product-db', DB_VERSION);
     const x = await dbConnection.query(`
-      SELECT 
+      SELECT
           name
-      FROM 
+      FROM
           sqlite_schema
-      WHERE 
-          type ='table' AND 
+      WHERE
+          type ='table' AND
           name NOT LIKE 'sqlite_%';
     `);
 
@@ -93,17 +93,25 @@ export class SqliteService {
     await this.sqlite.addUpgradeStatement('product-db', 5, statements);
   }
 
-  async setPragmaWAL2() {
+  async setPragmaWAL2(platform: string) {
     console.log('setting PRAGMA to WAL2');
+    if(platform === 'android') {
+      return;
+    }
     const dbConnection = await this.sqlite.openDB('test-db');
 
-    const statement = `PRAGMA journal_mode=WAL2;`
+    let statement = `PRAGMA journal_mode=wal;`;
+    if(platform === 'ios') {
+      statement = `PRAGMA journal_mode=wal2;`;
+    }
 
-    const result = await dbConnection.execute(statement);
+    const result = await dbConnection.execute(statement,false);
 
     console.log('PRAGMA was set successfully', result);
-
-    return result;
+    const stmt = `PRAGMA journal_mode;`;
+    const modeRet = await dbConnection.query(stmt);
+    console.log(`>>> mode: ${modeRet.values[0].journal_mode}`);
+    return;
   }
 
   async dropDatabase() {
@@ -122,7 +130,7 @@ export class SqliteService {
       id TEXT PRIMARY KEY NOT NULL,
       name TEXT NOT NULL
     );
-    `
+    `;
     const res = await dbConnection.execute(query);
     console.log('RES', res);
     if (res.changes && res.changes.changes && res.changes.changes < 0) {
@@ -130,27 +138,56 @@ export class SqliteService {
     }
 
     await this.sqlite.saveToStore('test-db');
-    console.log('TABLE LIST', await dbConnection.getTableList())
+    console.log('TABLE LIST', await dbConnection.getTableList());
   }
 
   async addDataToTestDB() {
-    await this.setPragmaWAL2();
+    const platform = this.sqlite.getPlatform();
+    await this.setPragmaWAL2(platform);
+    const transaction = ['ios','android'].includes(platform) ? true : false;
+    let dbConnection: SQLiteDBConnection;
+    try {
+      dbConnection = await this.sqlite.openDB('test-db');
+      if (!transaction) {
+        await dbConnection.execute('BEGIN TRANSACTION;', false);
+        console.log('after begin');
+      }
+      await Promise.all([
+        this.insertData(dbConnection, '1f6eb88cc-cf0b-41bb-b55b-52e71269273b1', 'Bob', transaction),
+        this.insertData(dbConnection, '2f6eb88cc-cf0b-41bb-b55b-52e71269273b2', 'Lina', transaction),
+        this.insertData(dbConnection, '3f6eb88cc-cf0b-41bb-b55b-52e71269273b3', 'Maria', transaction),
+      ]);
+      if (!transaction) {
+        await dbConnection.execute('COMMIT TRANSACTION;', false);
+        console.log('after commit');
+      }
+      await this.sqlite.saveToStore('test-db');
 
-    this.insertData('1f6eb88cc-cf0b-41bb-b55b-52e71269273b1', 'Bob');
-    this.insertData('2f6eb88cc-cf0b-41bb-b55b-52e71269273b2', 'Lina');
-    this.insertData('3f6eb88cc-cf0b-41bb-b55b-52e71269273b3', 'Maria');
+    } catch(err) {
+      const msg = err.message ? err.message : err;
+      console.log(`addDataToTestDB: ${err}`);
+      if (!transaction) {
+        await dbConnection.execute('ROLLBACK TRANSACTION;', false);
+        console.log('after rollback');
+      }
+    }
+
   }
 
-  async insertData(id: string, name: string) {
-    const dbConnection = await this.sqlite.openDB('test-db');
-    const result = await dbConnection.run('REPLACE INTO test(id, name) VALUES(?,?)', [id, name]);
-    console.log('RESULT', result);
-    await this.sqlite.saveToStore('test-db');
+  async insertData(dbConnection: SQLiteDBConnection ,id: string, name: string, transaction: boolean) {
+    try {
+      const result = await dbConnection.run('REPLACE INTO test(id, name) VALUES(?,?)', [id, name],transaction);
+      console.log('RESULT', result);
+    } catch (err) {
+      const msg = err.message ? err.message : err;
+      console.log(`msg: ${msg}`);
+      return Promise.reject(`Error: ${msg}`);
+    }
   }
 
   async printRegularCreatedTableQuery() {
     const dbConnection = await this.sqlite.openDB('test-db');
-    console.log('TABLE LIST', await dbConnection.getTableList())
+    console.log('TABLE LIST', await dbConnection.getTableList());
 
     const statement = 'SELECT * FROM test;';
     const values = [];
